@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Media Grabber</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #171a21;
+    --text: #eaecef;
+    --muted: #8b93a1;
+    --accent: #4f8cff;
+    --accent-2: #2ecf8a;
+    --err: #ff5d5d;
+    --border: #262b35;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px;
+  }
+  .wrap { width: 100%; max-width: 720px; }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  p.sub { color: var(--muted); margin-top: 0; margin-bottom: 28px; font-size: 0.9rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .url-row { display: flex; gap: 10px; }
+  input[type=text] {
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #10131a;
+    color: var(--text);
+    font-size: 0.95rem;
+    outline: none;
+  }
+  input[type=text]:focus { border-color: var(--accent); }
+  button {
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .fetch-btn {
+    padding: 12px 22px;
+    background: var(--accent);
+    color: white;
+  }
+  .dl-btn {
+    padding: 11px 22px;
+    background: var(--accent-2);
+    color: #0a1a12;
+    white-space: nowrap;
+  }
+  /* preview */
+  .preview { display: none; margin-top: 18px; }
+  .preview-main { display: flex; gap: 16px; }
+  .thumb {
+    width: 200px;
+    min-width: 200px;
+    aspect-ratio: 16/9;
+    border-radius: 10px;
+    object-fit: cover;
+    background: #10131a;
+    border: 1px solid var(--border);
+  }
+  .thumb.hidden { display: none; }
+  .meta { min-width: 0; }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .badge.video    { background: #1d3056; color: #8ab8ff; }
+  .badge.audio    { background: #14352a; color: #66e0ad; }
+  .badge.playlist { background: #3a2b12; color: #ffc266; }
+  .badge.unknown  { background: #2a2d35; color: var(--muted); }
+  .title { font-weight: 600; font-size: 1rem; margin: 0 0 4px; overflow-wrap: anywhere; }
+  .byline { color: var(--muted); font-size: 0.85rem; margin: 0; }
+  .dl-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  select {
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #10131a;
+    color: var(--text);
+    font-size: 0.9rem;
+    outline: none;
+  }
+  .tracks {
+    margin-top: 14px;
+    max-height: 180px;
+    overflow-y: auto;
+    border-top: 1px solid var(--border);
+  }
+  .track {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.83rem;
+    color: var(--muted);
+  }
+  .track .t-title { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* progress */
+  .progress-wrap { display: none; margin-top: 16px; }
+  .bar-outer {
+    height: 10px;
+    background: #10131a;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .bar-inner {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    border-radius: 8px;
+    transition: width 0.4s ease;
+  }
+  .status-line { font-size: 0.85rem; margin-top: 8px; color: var(--muted); }
+  .status-line.ok { color: var(--accent-2); }
+  .status-line.err { color: var(--err); }
+  .files a {
+    display: block;
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.85rem;
+    margin-top: 6px;
+  }
+  .files a:hover { text-decoration: underline; }
+  h2 { font-size: 1rem; color: var(--muted); font-weight: 500; margin: 0; }
+  .lib-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .clear-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--err);
+    font-size: 0.8rem;
+  }
+  .clear-btn:hover { border-color: var(--err); }
+  .lib-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.85rem;
+  }
+  .lib-item:last-child { border-bottom: none; }
+  .lib-thumb {
+    width: 72px;
+    min-width: 72px;
+    height: 44px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: #10131a;
+    border: 1px solid var(--border);
+  }
+  .lib-icon {
+    width: 72px;
+    min-width: 72px;
+    height: 44px;
+    border-radius: 6px;
+    background: #10131a;
+    border: 1px solid var(--border);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+  }
+  .lib-meta { flex: 1; min-width: 0; }
+  .lib-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lib-size { color: var(--muted); font-size: 0.75rem; margin-top: 2px; }
+  .lib-item a { color: var(--accent); text-decoration: none; white-space: nowrap; }
+  /* modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    width: 90%;
+    max-width: 380px;
+  }
+  .modal h3 { margin: 0 0 8px; font-size: 1.05rem; }
+  .modal p { color: var(--muted); font-size: 0.87rem; margin: 0 0 18px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal-cancel {
+    padding: 9px 16px;
+    border-radius: 8px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 0.85rem;
+  }
+  .modal-danger {
+    padding: 9px 16px;
+    border-radius: 8px;
+    background: var(--err);
+    color: white;
+    font-size: 0.85rem;
+  }
+  @media (max-width: 560px) {
+    .preview-main { flex-direction: column; }
+    .thumb { width: 100%; min-width: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎬 Media Grabber</h1>
+  <p class="sub">Paste a YouTube, Twitter/X, or Instagram link. Local use only.</p>
+
+  <div class="card">
+    <div class="url-row">
+      <input type="text" id="url" placeholder="Paste a link here…">
+      <button class="fetch-btn" id="fetchBtn">Fetch</button>
+    </div>
+
+    <div class="preview" id="preview">
+      <div class="preview-main">
+        <img class="thumb" id="thumb" alt="">
+        <div class="meta">
+          <span class="badge" id="badge"></span>
+          <p class="title" id="pvTitle"></p>
+          <p class="byline" id="pvByline"></p>
+        </div>
+      </div>
+      <div class="dl-row">
+        <select id="quality"></select>
+        <button class="dl-btn" id="dlBtn">Download</button>
+      </div>
+      <div class="tracks" id="tracks" style="display:none;"></div>
+    </div>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="bar-outer"><div class="bar-inner" id="bar"></div></div>
+      <div class="status-line" id="statusLine"></div>
+    </div>
+    <div class="files" id="files"></div>
+  </div>
+
+  <div class="card">
+    <div class="lib-head">
+      <h2>Library</h2>
+      <button class="clear-btn" id="clearBtn">Clear</button>
+    </div>
+    <div id="library"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3>Clear library?</h3>
+    <p id="modalText">This permanently deletes all downloaded files from the library.</p>
+    <div class="modal-actions">
+      <button class="modal-cancel" id="modalCancel">Cancel</button>
+      <button class="modal-danger" id="modalConfirm">Clear library</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fetchBtn = $("fetchBtn"), dlBtn = $("dlBtn");
+let current = null;   // result of the last probe
+
+function fmtDuration(s) {
+  if (s == null) return "";
+  s = Math.round(s);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  const mm = h ? String(m).padStart(2, "0") : m;
+  return (h ? h + ":" : "") + mm + ":" + String(sec).padStart(2, "0");
+}
+
+function esc(s) {
+  const d = document.createElement("div");
+  d.textContent = s ?? "";
+  return d.innerHTML;
+}
+
+fetchBtn.onclick = async () => {
+  const url = $("url").value.trim();
+  if (!url) return;
+  fetchBtn.disabled = true;
+  fetchBtn.textContent = "Loading…";
+  $("preview").style.display = "none";
+  $("progressWrap").style.display = "none";
+  $("files").innerHTML = "";
+
+  try {
+    const res = await fetch("/api/probe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url })
+    });
+    current = await res.json();
+    current.url = url;
+    renderPreview(current);
+  } catch (e) {
+    showStatus("err", "Could not fetch info for that link.");
+  } finally {
+    fetchBtn.disabled = false;
+    fetchBtn.textContent = "Fetch";
+  }
+};
+
+function renderPreview(info) {
+  const badge = $("badge");
+  badge.className = "badge " + info.type;
+  badge.textContent = info.type === "unknown" ? "media" : info.type;
+
+  $("pvTitle").textContent = info.title || "(untitled — download to find out)";
+  const parts = [];
+  if (info.uploader) parts.push(info.uploader);
+  if (info.type === "playlist") parts.push(info.count + " items");
+  else if (info.duration) parts.push(fmtDuration(info.duration));
+  $("pvByline").textContent = parts.join(" · ");
+
+  const thumb = $("thumb");
+  if (info.thumbnail) {
+    thumb.src = info.thumbnail;
+    thumb.classList.remove("hidden");
+  } else {
+    thumb.classList.add("hidden");
+  }
+
+  // quality dropdown
+  const sel = $("quality");
+  sel.innerHTML = "";
+  const add = (v, label) => {
+    const o = document.createElement("option");
+    o.value = v; o.textContent = label;
+    sel.appendChild(o);
+  };
+  if (info.type === "video") {
+    add("best", "Best quality");
+    (info.qualities || []).forEach(h => add(h, h + "p"));
+    add("audio", "Audio only (MP3)");
+  } else if (info.type === "audio") {
+    add("audio", "Best audio (MP3)");
+  } else if (info.type === "playlist") {
+    add("best", "Best quality");
+    [1080, 720, 480, 360].forEach(h => add(h, h + "p"));
+    add("audio", "Audio only (MP3)");
+  } else {
+    add("best", "Original");
+  }
+  sel.style.display = info.type === "audio" ? "none" : "";
+
+  dlBtn.textContent = info.type === "playlist" ? "Download all" : "Download";
+
+  // playlist track list
+  const tracks = $("tracks");
+  if (info.type === "playlist" && info.entries?.length) {
+    tracks.innerHTML = info.entries.map((e, i) => `
+      <div class="track">
+        <span class="t-title">${i + 1}. ${esc(e.title)}</span>
+        <span>${fmtDuration(e.duration)}</span>
+      </div>`).join("");
+    tracks.style.display = "";
+  } else {
+    tracks.style.display = "none";
+  }
+
+  $("preview").style.display = "block";
+}
+
+// yt-dlp downloads video then audio (0→100% twice per item); hold the max so
+// the bar never runs backwards
+let progState = { item: 1, max: 0 };
+
+dlBtn.onclick = async () => {
+  if (!current) return;
+  dlBtn.disabled = true;
+  progState = { item: 1, max: 0 };
+  $("files").innerHTML = "";
+  showProgress(null, "Starting…");
+
+  const res = await fetch("/api/download", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      url: current.url,
+      type: current.type,
+      quality: $("quality").value
+    })
+  });
+  const data = await res.json();
+  if (data.error) {
+    showStatus("err", data.error);
+    dlBtn.disabled = false;
+    return;
+  }
+  poll(data.job_id);
+};
+
+function showProgress(pct, text) {
+  $("progressWrap").style.display = "block";
+  $("bar").style.width = (pct ?? 0) + "%";
+  showStatus("", text);
+}
+
+function showStatus(kind, text) {
+  const el = $("statusLine");
+  el.className = "status-line " + kind;
+  el.textContent = text;
+  $("progressWrap").style.display = "block";
+}
+
+async function poll(jobId) {
+  const res = await fetch(`/api/status/${jobId}`);
+  const job = await res.json();
+
+  if (job.status === "running" || job.status === "queued") {
+    const itemN = job.item ? job.item.n : 1;
+    if (itemN !== progState.item) progState = { item: itemN, max: 0 };
+    if (job.progress != null) progState.max = Math.max(progState.max, job.progress);
+
+    let pct = progState.max;
+    let text = `Downloading… ${progState.max.toFixed(0)}%`;
+    if (job.item) {
+      pct = ((job.item.n - 1) + progState.max / 100) / job.item.of * 100;
+      text = `Downloading ${job.item.n} of ${job.item.of}… ${progState.max.toFixed(0)}%`;
+    }
+    showProgress(pct, text);
+    setTimeout(() => poll(jobId), 1200);
+  } else if (job.status === "done") {
+    showProgress(100, "");
+    dlBtn.disabled = false;
+    if (job.saved?.length) {
+      showStatus("ok", job.saved.length === 1
+        ? `Done! Saved to your Downloads folder: ${job.saved[0]}`
+        : `Done! Saved ${job.saved.length} files to your Downloads folder.`);
+    } else if (job.files.length) {
+      showStatus("ok", "Done! (already in your Downloads folder)");
+    } else {
+      showStatus("ok", "Done — nothing new (file may already exist).");
+    }
+    loadLibrary();
+  } else {
+    showStatus("err", job.error || "Something went wrong.");
+    dlBtn.disabled = false;
+  }
+}
+
+// files can live in subfolders (playlists, gallery-dl) — encode each segment
+function encodePath(p) {
+  return p.split("/").map(encodeURIComponent).join("/");
+}
+
+function fmtSize(bytes) {
+  if (bytes >= 1e9) return (bytes / 1e9).toFixed(2) + " GB";
+  if (bytes >= 1e6) return (bytes / 1e6).toFixed(1) + " MB";
+  return Math.max(1, Math.round(bytes / 1e3)) + " KB";
+}
+
+function iconFor(name) {
+  const ext = name.split(".").pop().toLowerCase();
+  if (["mp3", "m4a", "opus", "ogg", "wav", "flac"].includes(ext)) return "🎵";
+  if (["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) return "🖼";
+  return "🎬";
+}
+
+async function loadLibrary() {
+  const res = await fetch("/api/library");
+  const files = await res.json();
+  const libEl = $("library");
+  $("clearBtn").style.display = files.length ? "" : "none";
+  if (!files.length) {
+    libEl.innerHTML = '<div style="color:var(--muted); font-size:0.85rem;">No downloads yet.</div>';
+    return;
+  }
+  libEl.innerHTML = files.map(f => `
+    <div class="lib-item">
+      <img class="lib-thumb" src="/thumb/${encodePath(f.name)}" alt="" loading="lazy"
+           onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+      <div class="lib-icon">${iconFor(f.name)}</div>
+      <div class="lib-meta">
+        <div class="lib-name">${esc(f.name)}</div>
+        <div class="lib-size">${fmtSize(f.size)}</div>
+      </div>
+      <a href="/downloads/${encodePath(f.name)}">Download</a>
+    </div>
+  `).join("");
+}
+
+// clear-library confirmation modal
+const overlay = $("modalOverlay");
+$("clearBtn").onclick = () => overlay.classList.add("open");
+$("modalCancel").onclick = () => overlay.classList.remove("open");
+overlay.onclick = e => { if (e.target === overlay) overlay.classList.remove("open"); };
+$("modalConfirm").onclick = async () => {
+  $("modalConfirm").disabled = true;
+  try {
+    await fetch("/api/clear", { method: "POST" });
+    loadLibrary();
+  } finally {
+    $("modalConfirm").disabled = false;
+    overlay.classList.remove("open");
+  }
+};
+
+// pressing Enter in the URL box fetches
+$("url").addEventListener("keydown", e => { if (e.key === "Enter") fetchBtn.click(); });
+
+loadLibrary();
+</script>
+</body>
+</html>

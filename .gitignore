@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+downloads/*
+!downloads/.gitkeep
+.claude/
+.DS_Store
